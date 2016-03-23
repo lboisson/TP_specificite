@@ -3,28 +3,29 @@
 #include <string.h>
 #include <liste.h>
 
+#include <stdarg.h>
 
 /*
  * VARIABLE LOCALE
  */
 
-unsigned long int liste_cpt = 0 ; 
+unsigned long int liste_cpt = 0 ;
 
 /*
- * Methodes d'acces 
+ * Methodes d'acces
  */
 
 /* Nombre d'elements */
 
-extern 
+extern
 int liste_nb_lire( liste_t * const liste )
 {
   return(liste->nb );
-} 
+}
 
 /* -- Acces individuel a un element */
 
-extern 
+extern
 void * liste_elem_lire( liste_t * const liste  , const int ind )
 {
   if( (ind < 0) || (ind > liste_nb_lire(liste)-1 ) )
@@ -38,46 +39,43 @@ void * liste_elem_lire( liste_t * const liste  , const int ind )
 }
 
 /*
- * Tests 
+ * Tests
  */
 
-extern 
+extern
 booleen_t liste_existe( liste_t * const liste )
 {
   if( liste == NULL )
     {
-      return(FAUX) ; 
+      return(FAUX) ;
      }
   else
     {
-      return(VRAI) ; 
+      return(VRAI) ;
     }
 }
 
-extern 
+extern
 booleen_t liste_vide( liste_t * const liste )
 {
   if( liste->nb == 0 )
     {
-      return(VRAI) ; 
+      return(VRAI) ;
     }
   else
     {
-      return(FAUX) ; 
+      return(FAUX) ;
     }
 }
 
 /*
- * Methodes d'affectation 
+ * Methodes d'affectation
  */
 
 
 /* -- Acces individuel a un element */
-extern 
-err_t liste_elem_ecrire( liste_t * liste , 
-			 void * const elem ,
-			 const int ind ) 
-{
+extern
+err_t liste_elem_ecrire( liste_t * liste , void * const elem, const int ind ) {
 
 #ifdef _DEBUG_
   if( (ind < 0) || (ind > liste_nb_lire(liste) ) )
@@ -87,20 +85,19 @@ err_t liste_elem_ecrire( liste_t * liste ,
       return(ERR_LISTE_IND_ELEM);
     }
 #endif
-  liste->liste[ind] = elem ;
+  liste->affectation(elem, liste->liste+ind);
 
   return(OK) ;
 }
 
-
 /*
- * Creation d'une liste 
+ * Creation d'une liste
  */
 extern
-liste_t * liste_creer( const int nb )
+liste_t * liste_creer( const int nb, const int taille, err_t (*affectation)(void * const, void * const), err_t (*destruction)(void * const))
 {
   liste_t * liste ;
-  
+
   if(( liste= malloc(sizeof(liste_t))) == NULL )
     {
       fprintf( stderr , "liste_creer: debordement memoire lors de la creation d'une liste\n");
@@ -108,10 +105,13 @@ liste_t * liste_creer( const int nb )
     }
 
   liste->nb = nb ;
+  liste->affectation=affectation;
+  liste->destruction=destruction;
   liste->liste = (void**)NULL ;
-  if( nb > 0 ) 
+  liste->taille = taille;
+  if( nb > 0 )
     {
-      if( ( liste->liste = malloc( sizeof(void *) * nb ) ) == NULL ) 
+      if( ( liste->liste = malloc( sizeof(void *) * nb ) ) == NULL )
 	{
 	  fprintf( stderr , "liste_creer: debordement memoire lors de la creation d'une liste\n");
 	  free( liste ) ;
@@ -119,23 +119,32 @@ liste_t * liste_creer( const int nb )
 	}
     }
 
-  liste_cpt++ ; 
+  liste_cpt++;
 
   return(liste);
 }
 
 /*
- * Destruction d'une liste 
+ * Destruction d'une liste
  *
- * A FAIRE 
+ * A FAIRE
  */
 
 extern
-err_t liste_detruire( liste_t ** liste , ... )
+err_t liste_detruire( liste_t ** liste)
 {
-  /* 
-   * A FAIRE
-   */
+  int i;
+  if(!liste_existe(*liste)){
+    return ERROR;
+  }
+  int nb_obj=(*liste)->nb;
+  for(i=0;i<nb_obj;i++){
+    (*liste)->destruction((*liste)->liste+i);
+  }
+  free((*liste)->liste);
+  free(*liste);
+  *liste=NULL;
+  liste_cpt--;
   return(OK) ;
 }
 
@@ -147,28 +156,75 @@ err_t liste_detruire( liste_t ** liste , ... )
  *
  */
 
-extern 
-void liste_afficher( liste_t * const liste ,...)
+extern
+void liste_afficher( liste_t * const liste , void (*afficher)(const void * const))
 {
-  /*
-   * A FAIRE 
-   */
-  return ;
+  int i;
+  if(liste_existe(liste)){
+    int nb_obj=liste->nb;
+    for(i=0; i<nb_obj; i++)
+      afficher(liste->liste[i]);
+  }
 }
 
 /*
- * Tri d'une liste 
- * 
- * A FAIRE 
+ * Tri d'une liste
+ *
+ * A FAIRE
  *
  */
 
-extern
-err_t liste_trier( liste_t * liste , ... )
-{
-  /*
-   * A FAIRE 
-   */
+static
+err_t liste_trier_bulle(liste_t * const liste, int (*comparer)( const void * const, const void * const) ) {
 
-  return(OK) ; 
+    int i = 0 ;
+    int taille = liste->taille;
+    int pas_trier=1;
+    void * w;
+    int nb = liste->nb;
+    if((w=malloc(taille))==NULL) {
+        return ERROR;
+    }
+
+    while(pas_trier==1) {
+      for(i=0; i<nb-1;i++) {
+        if( comparer( liste->liste+i , liste->liste+i+1 ) > 0 ) {
+      	  memcpy( w , liste->liste[i] , taille ) ;
+      	  memcpy( liste->liste[i] , liste->liste[i+1] , taille ) ;
+      	  memcpy( liste->liste[i+1] , w , taille ) ;
+      	}
+        else
+          pas_trier=0;
+      }
+    }
+  free(w) ;
+  return OK;
+ }
+
+static
+err_t liste_trier_qsort(liste_t * const liste, int (*comparer)( const void * const, const void * const)){
+  qsort(liste->liste, liste->nb, sizeof(void *), comparer);
+  return OK;
+}
+
+extern
+err_t liste_trier( liste_t * const liste, int (*comparer)( const void * const, const void * const), int extra_arg, ...)
+{
+  va_list args;
+	type_tri_t type;
+	if (extra_arg) {
+		va_start(args, extra_arg);
+		type = va_arg(args, type_tri_t);
+		va_end(args);
+	} else {
+		type = QUICK;
+	}
+	switch (type) {
+		case QUICK:
+			return liste_trier_qsort(liste, comparer);
+		case PERSO:
+			return liste_trier_bulle(liste, comparer);
+		default:
+			return ERROR;
+	}
 }

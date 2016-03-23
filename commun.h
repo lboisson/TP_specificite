@@ -7,7 +7,7 @@
 typedef enum booleen_s { FAUX , VRAI } booleen_t ;
 
 /* Definition du type erreur */
-typedef int err_t ; 
+typedef int err_t ;
 
 /* Constantes */
 
@@ -15,10 +15,10 @@ typedef int err_t ;
 
 /* Erreurs */
 #define OK 0
+#define ERROR 1
 
-#define ERR_DEB_MEMOIRE -100 
+#define ERR_DEB_MEMOIRE -100
 
-#define ERR_LISTE_IND_ELEM  -200 
+#define ERR_LISTE_IND_ELEM  -200
 
 #endif
-
